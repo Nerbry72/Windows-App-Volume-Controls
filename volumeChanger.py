@@ -41,7 +41,28 @@ config.read_dict({
 if os.path.exists(CONFIG_FILE):
     config.read(CONFIG_FILE)
 
+notification_lock = threading.Lock()
+last_notification_time = 0
+notification_delay = 3
+
+def show_volume_flyout(volume):
+    global last_notification_time
+
+    def notify():
+        message = f"Volume: {int(volume * 100)}%"
+        icon.notify(message, "Volume Changed")
+
+    with notification_lock:
+        current_time = time.time()
+        if current_time - last_notification_time >= notification_delay:
+            last_notification_time = current_time
+            notify()
+
 def save_config():
+    if config.has_option('Settings', 'last_volume'):
+        last_volume = float(config.get('Settings', 'last_volume'))
+        config.set('Settings', 'last_volume', f"{last_volume:.2f}")
+
     with open(CONFIG_FILE, 'w') as f:
         config.write(f)
     logging.info("Configuration saved.")
@@ -157,7 +178,11 @@ enforce_thread = None
 stop_event = threading.Event()
 
 def create_image():
-    icon_path = os.path.join(os.path.dirname(__file__), 'volume.png')
+    if hasattr(sys, '_MEIPASS'):
+        icon_path = os.path.join(sys._MEIPASS, 'volume.png')
+    else:
+        icon_path = os.path.join(os.path.dirname(__file__), 'volume.png')
+
     return Image.open(icon_path)
 
 def on_quit(icon):
